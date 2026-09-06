@@ -66,6 +66,37 @@ This is acceptable for a five-minute prototype: it can park by plate and charge 
 
 **Solution.** Extract domain concepts: `Vehicle`, `ParkingSpot`, and `Ticket`; let a focused `ParkingLot` coordinate them. Version 1 introduces these concepts before adding patterns.
 
+## Version 1 — model the domain
+
+Version 1 moves state and behavior to the objects that own it. A `ParkingSpot` decides whether it can accept and park a vehicle; a `Ticket` records the parking event; `ParkingLot` orchestrates entry and exit.
+
+```mermaid
+classDiagram
+    class ParkingLot { -List~ParkingSpot~ spots; +park(Vehicle) Ticket; +unpark(Ticket) long }
+    class ParkingSpot { -String id; -VehicleType acceptedType; -Vehicle occupiedBy; +isAvailableFor(Vehicle) boolean; +park(Vehicle); +vacate() }
+    class Vehicle { <<record>> +String plateNumber; +VehicleType type }
+    class Ticket { <<record>> +String id; +Vehicle vehicle; +ParkingSpot spot; +Instant enteredAt }
+    class VehicleType { <<enumeration>> MOTORCYCLE; CAR; TRUCK }
+    ParkingLot *-- "many" ParkingSpot
+    ParkingLot ..> Ticket : creates
+    Ticket --> Vehicle
+    Ticket --> ParkingSpot
+    ParkingSpot --> Vehicle : occupiedBy
+    Vehicle --> VehicleType
+```
+
+**What changed from Version 0.** We can now point to a physical spot and a vehicle on every ticket, and spot invariants live in `ParkingSpot`. This is SRP in practice. There is no pattern yet: plain objects are the clearest tool.
+
+### Problem 2: allocation policy is embedded in the workflow
+
+**Problem.** `ParkingLot.park` selects the first compatible space itself. “Nearest entrance”, “lowest floor”, or “electric-vehicle priority” would each require editing the orchestrator.
+
+**Why it is bad.** Policies vary independently from the parking workflow. Conditionals grow, and testing a policy requires testing the whole lot.
+
+**OOP/SOLID signal.** This violates Open/Closed Principle (OCP) and Dependency Inversion Principle (DIP).
+
+**Solution.** Depend on a `SpotAllocationStrategy` abstraction; pass a concrete strategy into the lot. This is the Strategy pattern because the algorithm is selectable at runtime.
+
 ## Build and run
 
 ```bash
