@@ -37,6 +37,35 @@ Design a multi-floor parking lot. It should park compatible vehicles, issue tick
 
 The following commits progressively add each stage. The final sections and source links are added when the final design is in place.
 
+## Version 0 — simplest possible design
+
+Our first implementation has one `NaiveParkingLot`: it stores tickets, counts capacity, validates exits, and calculates a hard-coded fee. Its only purpose is to make the next problems visible. See [the source](src/main/java/com/hrsvd/parkinglot/v0/NaiveParkingLot.java).
+
+```mermaid
+classDiagram
+    class NaiveParkingLot {
+        -int capacity
+        -Map~String, Instant~ activeTickets
+        +NaiveParkingLot(int capacity)
+        +park(String plateNumber) String
+        +unpark(String ticketId) long
+        +availableSpaces() int
+    }
+    NaiveParkingLot *-- "many" Instant : entry times
+```
+
+This is acceptable for a five-minute prototype: it can park by plate and charge a flat hourly fee. But it cannot express vehicle sizes, physical spots, floors, payment, or different rate rules. More importantly, every new requirement changes this one class.
+
+### Problem 1: a god class
+
+**Problem.** Entry, parking inventory, tickets, time calculation, and pricing are coupled in `NaiveParkingLot`.
+
+**Why it is bad.** A change to any one concern risks the others. Unit tests must construct the entire lot to test a tariff, and neither vehicles nor spaces have meaningful domain behavior.
+
+**OOP/SOLID signal.** This violates the Single Responsibility Principle (SRP): a class should have one reason to change.
+
+**Solution.** Extract domain concepts: `Vehicle`, `ParkingSpot`, and `Ticket`; let a focused `ParkingLot` coordinate them. Version 1 introduces these concepts before adding patterns.
+
 ## Build and run
 
 ```bash
