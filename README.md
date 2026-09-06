@@ -131,6 +131,35 @@ classDiagram
 
 **Solution.** Add a `PricingStrategy`. It receives a completed ticket and returns a `BigDecimal`; the default implementation rounds duration to a whole hour.
 
+## Version 3 — make pricing replaceable
+
+`HourlyPricingStrategy` has exactly one responsibility: convert a closed `ParkingTicket` into a monetary amount. It is deliberately stateless except for injected rate data.
+
+```mermaid
+classDiagram
+    class ParkingTicket { -String id; -Vehicle vehicle; -int floorNumber; -String spotNumber; -Instant entryTime; -Instant exitTime; +close(Instant); +isActive() boolean }
+    class PricingStrategy { <<interface>> +calculate(ParkingTicket) BigDecimal }
+    class HourlyPricingStrategy { -Map~VehicleType, BigDecimal~ hourlyRates; +calculate(ParkingTicket) BigDecimal }
+    class Vehicle { <<record>> +String plateNumber; +VehicleType type }
+    class VehicleType { <<enumeration>> MOTORCYCLE; CAR; TRUCK }
+    HourlyPricingStrategy ..|> PricingStrategy
+    PricingStrategy ..> ParkingTicket
+    ParkingTicket --> Vehicle
+    HourlyPricingStrategy --> VehicleType : rate key
+```
+
+**What changed from Version 2.** Allocation and tariff variation are now independent. A weekend rate can implement the same interface without changing parking or ticket code. The `ParkingTicket` explicitly guards its lifecycle: it cannot be closed twice or before entry.
+
+### Problem 4: orchestration needs a stable boundary
+
+**Problem.** We now have a floor model and replaceable rules, but nothing coordinates an atomic entry/exit workflow or retains tickets. Letting callers manipulate spots and tickets directly risks stranded spots and lost tickets.
+
+**Why it is bad.** State persistence and application workflow are implicit. Moving from in-memory data to a database would force a rewrite of business logic.
+
+**OOP/SOLID signal.** Encapsulation asks us to protect invariants; DIP asks the application service to depend on a ticket repository interface.
+
+**Solution.** Introduce `ParkingLotService` as the use-case boundary and a small `TicketRepository` port. The service coordinates allocation, spot state, ticket storage, time, and pricing; it does not implement either policy.
+
 ## Build and run
 
 ```bash
