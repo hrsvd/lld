@@ -97,6 +97,40 @@ classDiagram
 
 **Solution.** Depend on a `SpotAllocationStrategy` abstraction; pass a concrete strategy into the lot. This is the Strategy pattern because the algorithm is selectable at runtime.
 
+## Version 2 — make allocation replaceable
+
+The final package begins here. `SpotAllocationStrategy` owns only the question “which usable space should be chosen?” and returns a `SpotAssignment`; `FirstAvailableSpotStrategy` is the default rule.
+
+```mermaid
+classDiagram
+    class SpotAllocationStrategy { <<interface>> +findSpot(Collection~ParkingFloor~, Vehicle) Optional~SpotAssignment~ }
+    class FirstAvailableSpotStrategy { +findSpot(Collection~ParkingFloor~, Vehicle) Optional~SpotAssignment~ }
+    class SpotAssignment { <<record>> +ParkingFloor floor; +ParkingSpot spot }
+    class ParkingFloor { -int number; -List~ParkingSpot~ spots; +spot(String) Optional~ParkingSpot~ }
+    class ParkingSpot { -String number; -SpotType type; -Vehicle vehicle; +canFit(Vehicle) boolean; +park(Vehicle); +vacate(String) }
+    class Vehicle { <<record>> +String plateNumber; +VehicleType type }
+    class SpotType { <<enumeration>> MOTORCYCLE; COMPACT; LARGE; +supports(VehicleType) boolean }
+    FirstAvailableSpotStrategy ..|> SpotAllocationStrategy
+    SpotAllocationStrategy ..> SpotAssignment
+    SpotAssignment --> ParkingFloor
+    SpotAssignment --> ParkingSpot
+    ParkingFloor *-- "many" ParkingSpot
+    ParkingSpot --> Vehicle : occupied by
+    ParkingSpot --> SpotType
+```
+
+**What changed from Version 1.** Compatibility moved from one rigid enum equality check to `SpotType.supports`, and allocation became a dedicated pluggable algorithm. The orchestration service can remain unchanged when product asks for “closest spot.”
+
+### Problem 3: pricing is another volatile rule
+
+**Problem.** A flat return value or tariff in the exit flow cannot support different vehicle prices, grace periods, weekends, or dynamic pricing.
+
+**Why it is bad.** It combines lifecycle management with a business rule likely to change, making changes risky and hard to test.
+
+**OOP/SOLID signal.** Again SRP/OCP/DIP apply: the coordinator should depend on a pricing abstraction, not a concrete tariff.
+
+**Solution.** Add a `PricingStrategy`. It receives a completed ticket and returns a `BigDecimal`; the default implementation rounds duration to a whole hour.
+
 ## Build and run
 
 ```bash
